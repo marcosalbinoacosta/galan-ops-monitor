@@ -1,0 +1,52 @@
+version: "3.8"
+
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=postgresql://galan:galan_secure_2026@postgres:5432/galan_ops
+      - N8N_WEBHOOK_URL=http://n8n:5678/webhook
+      - JWT_SECRET=galan_ops_jwt_secret_2026
+    depends_on:
+      - postgres
+      - n8n
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: galan
+      POSTGRES_PASSWORD: galan_secure_2026
+      POSTGRES_DB: galan_ops
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/seed-db.sql:/docker-entrypoint-initdb.d/seed.sql
+    restart: unless-stopped
+
+  n8n:
+    image: n8nio/n8n:latest
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=galan_admin
+      - N8N_BASIC_AUTH_PASSWORD=galan_n8n_2026
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=postgres
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_DATABASE=galan_ops
+      - DB_POSTGRESDB_USER=galan
+      - DB_POSTGRESDB_PASSWORD=galan_secure_2026
+    volumes:
+      - n8n_data:/home/node/.n8n
+    depends_on:
+      - postgres
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  n8n_data:

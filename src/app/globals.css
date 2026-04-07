@@ -1,0 +1,232 @@
+@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&family=Open+Sans:wght@300;400;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+@theme {
+  --color-galan-900: #0f1720;
+  --color-galan-800: #1a2332;
+  --color-galan-700: #243040;
+  --color-galan-600: #2c5f8a;
+  --color-galan-500: #3a7ab0;
+  --color-galan-400: #5a9fd4;
+
+  --color-teal-600: #2d7a7a;
+  --color-teal-500: #3a8c8c;
+  --color-teal-400: #4da8a8;
+  --color-teal-300: #6dc4c4;
+
+  --color-green-600: #4a8e45;
+  --color-green-500: #5ba555;
+  --color-green-400: #72c06b;
+
+  --color-alerta-critica: #ef4444;
+  --color-alerta-alta: #f97316;
+  --color-alerta-media: #eab308;
+  --color-alerta-baja: #3b82f6;
+
+  --font-sans: "Open Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-heading: "Montserrat", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
+body {
+  font-family: var(--font-sans);
+  color: #2d2d2d;
+  line-height: 1.7;
+  background: #fafafa;
+  overflow-x: hidden;
+}
+
+/* ===== GALAN CORPORATE HEADER ===== */
+.galan-topbar {
+  background: #1a2332;
+  padding: 6px 0;
+  font-size: 12px;
+  color: rgba(255,255,255,0.7);
+}
+.galan-header {
+  background: #ffffff;
+  box-shadow: 0 1px 8px rgba(0,0,0,0.06);
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+/* ===== HERO ===== */
+.galan-hero {
+  position: relative;
+  height: 180px;
+  background: linear-gradient(135deg, #1a2332 0%, #2c5f8a 40%, #3a8c8c 70%, #5ba555 100%);
+  display: flex;
+  align-items: flex-end;
+  padding-bottom: 24px;
+  overflow: hidden;
+}
+.galan-hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse at 20% 80%, rgba(90,165,85,0.15) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 20%, rgba(44,95,138,0.2) 0%, transparent 50%);
+}
+.galan-hero::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.03'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+}
+
+/* ===== PROCESS DIAGRAM ===== */
+.process-node {
+  background: #ffffff;
+  border: 2px solid #e8e8e8;
+  border-radius: 12px;
+  padding: 14px;
+  transition: all 0.25s ease;
+  cursor: pointer;
+  position: relative;
+}
+.process-node:hover {
+  border-color: #3a8c8c;
+  box-shadow: 0 6px 24px rgba(58,140,140,0.12);
+  transform: translateY(-2px);
+}
+.process-node.active {
+  border-color: #3a8c8c;
+  box-shadow: 0 6px 24px rgba(58,140,140,0.18);
+  background: #fafffe;
+}
+
+/* Flow arrow */
+.flow-arrow {
+  color: #ccc;
+  font-size: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Data pill */
+.data-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-family: "JetBrains Mono", monospace;
+  font-weight: 600;
+}
+
+/* Status dot */
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.status-dot.active {
+  background: #5ba555;
+  box-shadow: 0 0 6px rgba(91,165,85,0.5);
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+.status-dot.warning { background: #eab308; box-shadow: 0 0 4px rgba(234,179,8,0.3); }
+.status-dot.error { background: #ef4444; box-shadow: 0 0 4px rgba(239,68,68,0.3); }
+.status-dot.idle { background: #ccc; }
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; box-shadow: 0 0 6px rgba(91,165,85,0.5); }
+  50% { opacity: 0.7; box-shadow: 0 0 12px rgba(91,165,85,0.8); }
+}
+
+/* Metric card inside node */
+.node-metric {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 5px 0;
+  border-bottom: 1px solid #f5f5f5;
+}
+.node-metric:last-child { border-bottom: none; }
+.node-metric-label { font-size: 11px; color: #999; }
+.node-metric-value {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 12px;
+  font-weight: 600;
+  color: #1a2332;
+}
+
+/* Detail panel */
+.detail-panel {
+  background: #ffffff;
+  border: 1px solid #eee;
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+  transition: box-shadow 0.2s ease;
+}
+
+/* Section title with Galan accent */
+.section-title {
+  font-family: "Montserrat", sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  color: #1a2332;
+  position: relative;
+  padding-bottom: 10px;
+  margin-bottom: 16px;
+}
+.section-title::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 40px;
+  height: 3px;
+  background: linear-gradient(to right, #3a8c8c, #5ba555);
+  border-radius: 2px;
+}
+
+/* Alert badge */
+.alert-badge {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.alert-badge.critica { background: #fef2f2; color: #ef4444; }
+.alert-badge.alta { background: #fff7ed; color: #f97316; }
+.alert-badge.media { background: #fefce8; color: #ca8a04; }
+.alert-badge.baja { background: #eff6ff; color: #3b82f6; }
+
+/* IA recommendation box */
+.ia-recommendation {
+  background: linear-gradient(135deg, rgba(58,140,140,0.04), rgba(91,165,85,0.04));
+  border-left: 3px solid #3a8c8c;
+  padding: 10px 14px;
+  border-radius: 0 8px 8px 0;
+}
+
+/* Footer */
+.galan-footer {
+  background: #1a2332;
+  color: rgba(255,255,255,0.7);
+  margin-top: 40px;
+}
+
+/* Highlight box */
+.highlight-box {
+  background: linear-gradient(135deg, rgba(58,140,140,0.04), rgba(91,165,85,0.04));
+  border-left: 4px solid #3a8c8c;
+  padding: 16px 20px;
+  border-radius: 0 10px 10px 0;
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .process-flow-horizontal { flex-direction: column; }
+  .flow-arrow { transform: rotate(90deg); }
+  .galan-hero { height: 140px !important; }
+}

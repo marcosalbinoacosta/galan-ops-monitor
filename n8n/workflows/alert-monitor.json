@@ -1,0 +1,347 @@
+{
+  "name": "Galan HMW - Monitor de Alertas con IA",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 5
+            }
+          ]
+        }
+      },
+      "id": "a1b2c3d4-0001-4000-8000-000000000001",
+      "name": "Cada 5 minutos",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [250, 300],
+      "typeVersion": 1.2
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://galan-ops-monitor.vercel.app/api/dashboard",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "a1b2c3d4-0001-4000-8000-000000000002",
+      "name": "Obtener datos sensores",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [480, 300],
+      "typeVersion": 4.2
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "check-alerts",
+              "leftValue": "={{ $json.kpis.alertas_activas }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a1b2c3d4-0001-4000-8000-000000000003",
+      "name": "Hay alertas activas?",
+      "type": "n8n-nodes-base.if",
+      "position": [700, 300],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "jsCode": "const dashboardData = $input.first().json;\nconst kpis = dashboardData.kpis || {};\nconst pozos = dashboardData.pozos || [];\nconst meteo = dashboardData.meteo || {};\nconst alertas = dashboardData.alertas || [];\n\nconst alerta = alertas.find(a => a.estado === 'activa') || alertas[0];\n\nif (!alerta) {\n  return [{ json: { skip: true } }];\n}\n\nconst contexto = {\n  alerta: {\n    titulo: alerta.titulo || 'Sin titulo',\n    categoria: alerta.categoria || 'produccion',\n    descripcion: alerta.descripcion || '',\n    severidad_sugerida: alerta.severidad || 'media',\n    origen: alerta.origen || 'sensor'\n  },\n  operacion: {\n    pozos_activos: kpis.pozos_activos || 5,\n    pozos_total: kpis.pozos_total || 7,\n    produccion_hoy: kpis.produccion_hoy_ton || 0,\n    concentracion_li: kpis.concentracion_promedio_li || 859,\n    temperatura: meteo.temperatura_c || 12,\n    viento_kmh: meteo.velocidad_viento_kmh || 14\n  }\n};\n\nconst groqBody = {\n  model: 'llama-3.1-8b-instant',\n  messages: [\n    {\n      role: 'system',\n      content: 'Eres un analista de operaciones de una planta de extraccion de litio en el Salar del Hombre Muerto, Catamarca, Argentina, a 4000 msnm. La operacion incluye 7 pozos de extraccion de salmuera (820-900 mg/L Li), 6 pozas de evaporacion en 4 etapas (halita, silvinita, carnalita, concentracion final), y una planta de nanofiltracion. Tu tarea: 1) Clasificar la severidad (baja/media/alta/critica), 2) Dar una recomendacion tecnica especifica en 2-3 oraciones, 3) Indicar si requiere escalamiento al supervisor. Responde en formato JSON con las claves: severidad, recomendacion, requiere_escalamiento (boolean).'\n    },\n    {\n      role: 'user',\n      content: 'Analiza la siguiente alerta operativa y su contexto: ' + JSON.stringify(contexto)\n    }\n  ],\n  temperature: 0.3,\n  max_tokens: 500\n};\n\nreturn [{\n  json: {\n    alerta_original: alerta,\n    groq_body: groqBody\n  }\n}];\n"
+      },
+      "id": "a1b2c3d4-0001-4000-8000-000000000004",
+      "name": "Preparar alerta para LLM",
+      "type": "n8n-nodes-base.code",
+      "position": [940, 200],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_GROQ_API_KEY"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.groq_body) }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "a1b2c3d4-0001-4000-8000-000000000005",
+      "name": "Groq LLM - Analizar alerta",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [1180, 200],
+      "typeVersion": 4.2
+    },
+    {
+      "parameters": {
+        "jsCode": "const llmResponse = $input.first().json;\nconst llmContent = llmResponse.choices[0].message.content;\nconst alertaOriginal = $('Preparar alerta para LLM').first().json.alerta_original;\n\nlet analisis = {};\ntry {\n  analisis = JSON.parse(llmContent);\n} catch (e) {\n  const jsonMatch = llmContent.match(/```(?:json)?\\s*([\\s\\S]*?)```/);\n  if (jsonMatch) {\n    try { analisis = JSON.parse(jsonMatch[1].trim()); } catch (e2) {}\n  }\n  if (!analisis.severidad) {\n    analisis = {\n      severidad: 'media',\n      recomendacion: llmContent,\n      requiere_escalamiento: false\n    };\n  }\n}\n\nconst severidad = (analisis.severidad || 'media').toLowerCase();\n\nreturn [{\n  json: {\n    id: 'ALT-' + Date.now(),\n    titulo: alertaOriginal.titulo || ('Alerta operativa - ' + severidad.toUpperCase()),\n    severidad: severidad,\n    categoria: alertaOriginal.categoria || 'produccion',\n    descripcion: alertaOriginal.descripcion || '',\n    recomendacion_ia: analisis.recomendacion || llmContent,\n    requiere_escalamiento: analisis.requiere_escalamiento || false,\n    origen: alertaOriginal.origen || 'n8n workflow',\n    estado: 'activa',\n    procesado_por: 'n8n-groq-llama3.1',\n    timestamp: new Date().toISOString()\n  }\n}];\n"
+      },
+      "id": "a1b2c3d4-0001-4000-8000-000000000006",
+      "name": "Formatear alerta enriquecida",
+      "type": "n8n-nodes-base.code",
+      "position": [1420, 200],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://galan-ops-monitor.vercel.app/api/alertas",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "a1b2c3d4-0001-4000-8000-000000000007",
+      "name": "Guardar alerta enriquecida",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [1660, 200],
+      "typeVersion": 4.2
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "check-severity-critica",
+              "leftValue": "={{ $json.severidad }}",
+              "rightValue": "critica",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "check-severity-alta",
+              "leftValue": "={{ $json.severidad }}",
+              "rightValue": "alta",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "id": "a1b2c3d4-0001-4000-8000-000000000008",
+      "name": "Es critica o alta?",
+      "type": "n8n-nodes-base.if",
+      "position": [1900, 200],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "sendTo": "marcosalbinoacosta@gmail.com",
+        "subject": "=[ALERTA {{ $json.severidad.toUpperCase() }}] Operacion HMW - {{ $json.titulo }}",
+        "emailType": "text",
+        "message": "=ALERTA OPERATIVA - PLANTA HMW Phase 1\n========================================\n\nSeveridad: {{ $json.severidad.toUpperCase() }}\nCategoria: {{ $json.categoria }}\nFecha/Hora: {{ $json.timestamp }}\n\nTitulo: {{ $json.titulo }}\nDescripcion: {{ $json.descripcion }}\n\nRecomendacion IA (Groq/LLaMA 3.1):\n{{ $json.recomendacion_ia }}\n\nRequiere escalamiento: {{ $json.requiere_escalamiento ? 'SI' : 'NO' }}\n\n---\nDashboard: https://galan-ops-monitor.vercel.app/alertas\nGenerado automaticamente por Galan Ops Monitor\nProcesado por: {{ $json.procesado_por }}",
+        "options": {}
+      },
+      "id": "a1b2c3d4-0001-4000-8000-000000000009",
+      "name": "Notificar por email",
+      "type": "n8n-nodes-base.gmail",
+      "position": [2140, 100],
+      "typeVersion": 2.1,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "",
+          "name": "Gmail - Marcos"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "a1b2c3d4-0001-4000-8000-000000000010",
+      "name": "Sin alertas criticas",
+      "type": "n8n-nodes-base.noOp",
+      "position": [2140, 300],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {},
+      "id": "a1b2c3d4-0001-4000-8000-000000000011",
+      "name": "Sin alertas activas",
+      "type": "n8n-nodes-base.noOp",
+      "position": [940, 420],
+      "typeVersion": 1
+    }
+  ],
+  "connections": {
+    "Cada 5 minutos": {
+      "main": [
+        [
+          {
+            "node": "Obtener datos sensores",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Obtener datos sensores": {
+      "main": [
+        [
+          {
+            "node": "Hay alertas activas?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hay alertas activas?": {
+      "main": [
+        [
+          {
+            "node": "Preparar alerta para LLM",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Sin alertas activas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar alerta para LLM": {
+      "main": [
+        [
+          {
+            "node": "Groq LLM - Analizar alerta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq LLM - Analizar alerta": {
+      "main": [
+        [
+          {
+            "node": "Formatear alerta enriquecida",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Formatear alerta enriquecida": {
+      "main": [
+        [
+          {
+            "node": "Guardar alerta enriquecida",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guardar alerta enriquecida": {
+      "main": [
+        [
+          {
+            "node": "Es critica o alta?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Es critica o alta?": {
+      "main": [
+        [
+          {
+            "node": "Notificar por email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Sin alertas criticas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "staticData": null,
+  "tags": [
+    { "name": "galan-hmw" },
+    { "name": "alertas" },
+    { "name": "ia" },
+    { "name": "produccion" }
+  ],
+  "triggerCount": 1,
+  "active": false,
+  "versionId": "2"
+}
